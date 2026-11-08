@@ -1,0 +1,99 @@
+plugins { id 'java'; id 'net.minecraftforge.gradle' version '[6.0,6.2)' }
+version = '1.0.0-beta.1-r224'
+group = 'cn.oremarket'
+base { archivesName = 'oremarket' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+minecraft { mappings channel: 'official', version: '1.20.1' }
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.4.23'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+}
+test {
+    useJUnitPlatform()
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+processResources {
+    from(rootDir) { include 'LICENSE' }
+    // NOTE: never use expand (the Groovy template swallows the literal \n into a real line break,
+    // which splits a mods.toml single-line string and makes Forge crash with "corrupt or misconfigured toml").
+    // ReplaceTokens is byte-stream level @token@ substitution; it never touches backslash escapes.
+    // Keep the user-facing Forge version stable; the build suffix only distinguishes downloaded jars.
+    def displayVersion = project.version.toString().replaceAll(/-r\d+$/, '')
+    def tokens = [mod_id: 'oremarket', mod_name: 'OreMarket', mod_version: displayVersion,
+                  minecraft_version: '1.20.1', forge_version: '47.2.0']
+    inputs.properties tokens
+    filteringCharset = 'UTF-8'
+    filesMatching('META-INF/mods.toml') {
+        filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: tokens)
+    }
+    def renderedToml = layout.buildDirectory.file('resources/main/META-INF/mods.toml')
+    doLast {
+        def f = renderedToml.get().asFile
+        def problems = []
+        if (!f.exists()) {
+            problems << 'processResources did not produce META-INF/mods.toml'
+        } else {
+            def text = f.getText('UTF-8')
+            if (text.contains('${')) problems << 'leftover ${...} placeholder (template variable not replaced)'
+            if (text =~ /@[^@"\s]+@/) problems << 'leftover @...@ placeholder (token not replaced)'
+            // A TOML single-line double-quoted string must not contain real line breaks: check quote closure line by line
+            // (first strip backslash escape pairs such as \n and \", then count the bare quotes left on the line)
+            f.readLines('UTF-8').eachWithIndex { line, i ->
+                if (line.trim().startsWith('#')) return
+                def bare = line.replaceAll(/\\./, '')
+                if (bare.count('"') % 2 != 0) {
+                    problems << "line ${i + 1}: unclosed double-quoted string (a real line break crept in or a quote is missing), invalid TOML; write a literal \\n to break lines"
+                }
+            }
+        }
+        if (!problems.isEmpty()) {
+            throw new GradleException('mods.toml render validation failed: ' + problems.join('; '))
+        }
+    }
+}
+tasks.register('verifySourceHygiene', Exec) {
+    group = 'verification'
+    description = 'Checks Java source for non-English comments and revision-history wording'
+    commandLine 'bash', file('scripts/check_source_hygiene.sh').absolutePath, projectDir.absolutePath
+}
+
+tasks.register('verifyReadability', Exec) {
+    group = 'verification'
+    description = 'Ratchet-checks Java readability and package boundaries'
+    commandLine 'python3', file('scripts/check_readability.py').absolutePath,
+            projectDir.absolutePath, '--baseline', file('config/readability-baseline.json').absolutePath
+    inputs.files(fileTree('src/main/java'), fileTree('src/test/java'), file('scripts/check_readability.py'), file('config/readability-baseline.json'))
+}
+
+tasks.named('compileJava') {
+    dependsOn tasks.named('verifySourceHygiene'), tasks.named('verifyReadability')
+}
+
+// i18n gate: the four language tables must be consistent, en_us is ASCII-only, log key discipline and
+// non-ASCII Java string literals fail the build; Component.literal and Chinese in Java comments stay
+// development WARNs (source comments must be English; .comment(...) config strings are bilingual by design).
+def i18nGuardClass = 'cn.oremarket.common.I18nGuard'
+tasks.register('checkI18n', JavaExec) {
+    group = 'verification'
+    description = 'internationalization guard scan of the language tables and source (table violations fail the build)'
+    dependsOn tasks.named('compileJava')
+    mainClass.set(i18nGuardClass)
+    args = [projectDir.absolutePath]
+    classpath = sourceSets.main.runtimeClasspath
+}
+tasks.named('build') { dependsOn tasks.named('checkI18n') }
+
+jar {
+    manifest {
+        attributes([
+            'Specification-Title': 'oremarket',
+            'Specification-Vendor': 'Redpotato77',
+            'Specification-Version': '1',
+            'Implementation-Title': 'OreMarket',
+            'Implementation-Version': project.version,
+            'Implementation-Vendor': 'Redpotato77',
+            'License': 'GPL-3.0-or-later'
+        ])
+    }
+}
+jar.finalizedBy('reobfJar')
