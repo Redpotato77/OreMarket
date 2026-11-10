@@ -19,9 +19,12 @@
 package cn.oremarket.common;
 
 /**
- * Log types. The server sends only the ordinal; the client colors by the same table:
- * buy green 0xFF3FBF5F, sell red 0xFFE04A4A, exchange blue 0xFF4A7FD0,
- * event purple 0xFF9A4AD0, system gray 0xFF888888.
+ * Log types. The server sends only the ordinal; the client paints the prefix from this table:
+ * exchange blue 0xFF4A7FD0, event purple 0xFF9A4AD0 and system gray 0xFF888888 are non-directional and fixed.
+ * BUY / SELL use the theme's own trade-log pair (logColorScheme, green buy / red sell by default), so the log page
+ * does not flip with the quote convention unless an operator reconnects it with FOLLOW_MARKET.
+ * The two literals below are the documented fallback hues for a consumer without a config snapshot and match the
+ * default pair.
  *
  * Each type name also registers a translation key {@link #labelKey};
  * the client looks its prefix up by key in the current language instead of reverse-matching the Chinese label.

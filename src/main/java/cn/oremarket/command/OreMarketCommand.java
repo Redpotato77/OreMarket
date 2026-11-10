@@ -500,7 +500,8 @@ public final class OreMarketCommand {
             return 0;
         }
         double chg = st.changePercent();
-        ChatFormatting fmt = chg >= 0 ? ChatFormatting.RED : ChatFormatting.GREEN;
+        // The rising/falling hue comes from one place: the server's configured colour convention (red-up or green-up).
+        ChatFormatting fmt = cn.oremarket.market.MarketSettings.server().changeStyle(chg);
         ctx.getSource().sendSuccess(() -> Component.translatable("oremarket.cmd.price",
                         stock.displayName(),
                         String.format(Locale.ROOT, "%.2f", st.price),

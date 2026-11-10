@@ -1,0 +1,14 @@
+build/
+dist/
+.gradle/
+run/
+runs/
+logs/
+*.class
+__pycache__/
+*.pyc
+*.swp
+.DS_Store
+.idea/
+*.iml
+.vscode/

@@ -43,9 +43,8 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 @Mod(OreMarketMod.MOD_ID)
 public final class OreMarketMod {
     public static final String MOD_ID = "oremarket";
-    /** Mod version as shown to users. Matches build.gradle's version with the internal build suffix (-rNNN) stripped -
-     *  mods.toml's @mod_version@ is rendered the same way; keep the base number in sync across all three. */
-    public static final String MOD_VERSION = "1.0.0-beta.1";
+    /** Mod version shown in the log; keep it identical to build.gradle and the mods.toml display version. */
+    public static final String MOD_VERSION = "1.0.0-beta.2";
 
     public OreMarketMod() {
         org.slf4j.LoggerFactory.getLogger("OreMarket").info(

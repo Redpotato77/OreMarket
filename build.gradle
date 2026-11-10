@@ -1,5 +1,5 @@
 plugins { id 'java'; id 'net.minecraftforge.gradle' version '[6.0,6.2)' }
-version = '1.0.0-beta.1-r224'
+version = '1.0.0-beta.2-r227'
 group = 'cn.oremarket'
 base { archivesName = 'oremarket' }
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
@@ -17,7 +17,8 @@ processResources {
     // NOTE: never use expand (the Groovy template swallows the literal \n into a real line break,
     // which splits a mods.toml single-line string and makes Forge crash with "corrupt or misconfigured toml").
     // ReplaceTokens is byte-stream level @token@ substitution; it never touches backslash escapes.
-    // Keep the user-facing Forge version stable; the build suffix only distinguishes downloaded jars.
+    // Keep the user-facing Forge version stable. A local build suffix such as -r12 is stripped before it is
+    // rendered into mods.toml, so the in-game version remains the clean release number.
     def displayVersion = project.version.toString().replaceAll(/-r\d+$/, '')
     def tokens = [mod_id: 'oremarket', mod_name: 'OreMarket', mod_version: displayVersion,
                   minecraft_version: '1.20.1', forge_version: '47.2.0']

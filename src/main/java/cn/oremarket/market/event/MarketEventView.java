@@ -21,6 +21,7 @@ package cn.oremarket.market.event;
 import cn.oremarket.common.EffectType;
 import cn.oremarket.common.Rarity;
 import cn.oremarket.market.ActiveEvent;
+import cn.oremarket.market.MarketSettings;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -51,12 +52,10 @@ public final class MarketEventView {
     private static final double MAX_REALIZED_VALUE = 1.0e18;
     /** Border color for a preview card without a real event effect. */
     private static final int PREVIEW_BORDER_COLOR = 0xFF666666;
-    /** Border colors for the three event directions shown by the client. */
-    private static final int BULL_TONE_COLOR = 0xFFE04A4A;
-    private static final int BEAR_TONE_COLOR = 0xFF3FBF5F;
+    /** Neutral / mixed tone stays grey and never flips. */
     private static final int NEUTRAL_TONE_COLOR = 0xFFAAAAAA;
 
-    /** Progress-bar / tone: bullish (red) / bearish (green) / mixed or neutral (gray). */
+    /** Progress-bar / tone: bullish (the scheme's rising colour) / bearish (its falling colour) / mixed or neutral (gray). */
     public static final int TONE_NEUTRAL = 0;
     public static final int TONE_BULL = 1;
     public static final int TONE_BEAR = 2;
@@ -198,11 +197,12 @@ public final class MarketEventView {
         return TONE_NEUTRAL;
     }
 
-    /** Progress-bar color (requirement 2, item 12: bullish red / bearish green / mixed gray). */
+    /** Progress-bar color: bullish / bearish follow the theme's rising and falling slots (mixed or neutral is grey). */
     public int toneColor() {
+        MarketSettings ms = MarketSettings.current();
         return switch (tone) {
-            case TONE_BULL -> BULL_TONE_COLOR;
-            case TONE_BEAR -> BEAR_TONE_COLOR;
+            case TONE_BULL -> ms.riseColor();
+            case TONE_BEAR -> ms.fallColor();
             default -> NEUTRAL_TONE_COLOR;
         };
     }

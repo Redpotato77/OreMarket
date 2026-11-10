@@ -225,6 +225,12 @@ public final class MarketScreen extends Screen {
     private static int PNL_FLAT = THEME_MUTED;
     private static int K_BODY_UP = THEME_PNL_UP;
     private static int K_BODY_DOWN = THEME_PNL_DOWN;
+    /**
+     * Trade-log prefixes: a pair of their own, driven by [uiTheme].logColorScheme (default green buy / red sell),
+     * so the log page keeps its convention even when the market quotes flip to the other colour scheme.
+     */
+    private static int LOG_BUY = 0xFF3FBF5F;
+    private static int LOG_SELL = 0xFFE04A4A;
     /** Unchanged candles use a white body so a sealed one-price board is visibly a horizontal white line. */
     private static int K_BODY_FLAT = TEXT_WHITE;
     private static int K_WICK_UP = 0xFFCC3A3A;
@@ -305,7 +311,7 @@ public final class MarketScreen extends Screen {
     private static final int M_SHORT_ONECLICK = 903;
     /** Close Half - sends floor(position shares / 2), so 3 shares -> 1 share. */
     private static final int M_SHORT_CLOSE_HALF = 904;
-    /** Yellow warning colour when the short pool has less than 20% left (an empty pool uses the theme red PNL_UP, a full one uses white). */
+    /** Yellow warning colour when the short pool has less than 20% left (an empty pool uses the warning red, a full one uses white). */
     private static final int SHORT_POOL_YELLOW = 0xFFFFE066;
     private static final int M_ORDER_BUY = 910;
     private static final int M_ORDER_SELL = 911;
@@ -1016,6 +1022,8 @@ public final class MarketScreen extends Screen {
         PNL_UP = THEME_PNL_UP;
         PNL_DOWN = THEME_PNL_DOWN;
         PNL_FLAT = THEME_MUTED;
+        LOG_BUY = ms.logBuyColor();
+        LOG_SELL = ms.logSellColor();
         K_BODY_UP = PNL_UP;
         K_BODY_DOWN = PNL_DOWN;
         K_BODY_FLAT = TEXT_WHITE;
@@ -2971,7 +2979,7 @@ public final class MarketScreen extends Screen {
                 } else {
                     // Missing quotes / locked / non-positive price -> show the frozen-for-trading notice,
                     // never misusing the loan-overdue recovery text (that is a loan log key, not a quote state).
-                    int freezeCol = pickerRowBlocked(st, i) ? PNL_UP : GRAY88;
+                    int freezeCol = pickerRowBlocked(st, i) ? TOAST_RED : GRAY88;
                     drawFitRight(g, trKey("oremarket.error.stock_frozen"),
                             x2 - 6, ty, priceW, freezeCol);
                 }
@@ -5211,7 +5219,7 @@ public final class MarketScreen extends Screen {
         if (y + 9 > tradeContentBottom()) {
             return;
         }
-        drawFitLeft(g, warn, left, y, Math.max(10, right - left), PNL_UP);
+        drawFitLeft(g, warn, left, y, Math.max(10, right - left), TOAST_RED);
     }
 
     /**
@@ -5377,7 +5385,7 @@ public final class MarketScreen extends Screen {
                 int poolColor = TEXT_WHITE;
                 if (poolMaximum >= 0) {
                     if (poolRemaining <= 0) {
-                        poolColor = PNL_UP;                       // 0 shares: red
+                        poolColor = TOAST_RED;                     // 0 shares: the warning red, never the falling colour
                     } else if ((long) poolRemaining * 5L < (long) Math.max(1, poolMaximum)) {
                         poolColor = SHORT_POOL_YELLOW;            // remaining < 20%: yellow
                     }
@@ -7307,7 +7315,7 @@ public final class MarketScreen extends Screen {
                         }
                         String line = wrap.lines.get(j);
                         if (j == 0 && pw <= W && line.startsWith(prefix)) {
-                            pageText(g, prefix, textX, lineY, type.color);
+                            pageText(g, prefix, textX, lineY, logPrefixColor(type));
                             pageText(g, line.substring(prefix.length()), textX + pw, lineY, LOG_TEXT);
                         } else {
                             pageText(g, line, textX, lineY, LOG_TEXT);
@@ -9620,7 +9628,23 @@ public final class MarketScreen extends Screen {
         return Math.max(lo, Math.min(hi, v));
     }
 
-    /** Profit colours: gain red 0xFFE04A4A, loss green 0xFF3FBF5F, flat grey 0xFFAAAAAA. */
+    /**
+     * Log prefix colour. BUY / SELL come from the trade-log pair resolved by the client snapshot, so the log page
+     * follows its own logColorScheme (green buy / red sell by default) instead of the quote direction convention;
+     * FOLLOW_MARKET is the one setting that reconnects them. The remaining types are non-directional categories
+     * and keep their fixed hue.
+     */
+    private static int logPrefixColor(LogType type) {
+        if (type == LogType.BUY) {
+            return LOG_BUY;
+        }
+        if (type == LogType.SELL) {
+            return LOG_SELL;
+        }
+        return type.color;
+    }
+
+    /** Profit colours: a gain uses the scheme's rising colour, a loss its falling colour, a flat value grey. */
     private static int pnlColor(double v) {
         return v > 0.005 ? PNL_UP : v < -0.005 ? PNL_DOWN : PNL_FLAT;
     }

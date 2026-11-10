@@ -32,6 +32,30 @@ import java.util.List;
  */
 public final class OreMarketConfig {
 
+    /**
+     * Rising / falling colour convention. The switch exchanges the three directional colour pairs
+     * (quote text, profit-and-loss plus candle bodies, candle wicks) at one choke point, so quotes, P&L, candles,
+     * the order-book and limit-order direction labels, event tone bars and the price-command chat colour all
+     * flip together. Trade-log prefixes use the separate logColorScheme setting. Non-directional colours (warnings, errors, rarities,
+     * buttons, plain text) never move.
+     */
+    public enum ColorScheme {
+        /** A-share convention: red = rising / profit / bullish candle, green = falling / loss (default). */
+        RED_UP,
+        /** US-stock convention: green = rising / profit / bullish candle, red = falling / loss. */
+        GREEN_UP
+    }
+
+    /** Trade-log prefix convention; independent from the market's rising/falling colour convention. */
+    public enum LogColorScheme {
+        /** Buy prefix is green, sell prefix is red (default). Not affected by {@link ColorScheme}. */
+        BUY_GREEN,
+        /** Buy prefix is red, sell prefix is green. Not affected by {@link ColorScheme}. */
+        BUY_RED,
+        /** Legacy coupling: buy follows the rising colour and sell follows the falling colour of {@link ColorScheme}. */
+        FOLLOW_MARKET
+    }
+
     /** Network sync mode: the original three tiers kept; decides snapshot push frequency only. */
     public enum SyncModel {
         /** FULL: every marketTick pushes the whole snapshot to all players. */
@@ -446,6 +470,14 @@ public final class OreMarketConfig {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> CUSTOM_STOCKS;
 
     // ---------------------------------------------------------- category 20: UI theme (all 24-bit RGB, out of range falls back to default; effective values are always opaque)
+    /** Rising/falling colour convention; GREEN_UP swaps the quote / P&L / wick up-down pairs read from the keys below. */
+    public static final ForgeConfigSpec.EnumValue<ColorScheme> UI_COLOR_SCHEME;
+    /** Trade-log prefix convention; swaps the two log slots below and is never touched by the market convention. */
+    public static final ForgeConfigSpec.EnumValue<LogColorScheme> UI_LOG_COLOR_SCHEME;
+    /** Log buy prefix colour (the green half of the default log pair). */
+    public static final ForgeConfigSpec.IntValue UI_LOG_BUY_RGB;
+    /** Log sell prefix colour (the red half of the default log pair). */
+    public static final ForgeConfigSpec.IntValue UI_LOG_SELL_RGB;
     public static final ForgeConfigSpec.IntValue UI_PANEL_ROOT_RGB;
     public static final ForgeConfigSpec.IntValue UI_PANEL_SOFT_RGB;
     public static final ForgeConfigSpec.IntValue UI_PANEL_ROW_RGB;
@@ -607,7 +639,16 @@ public final class OreMarketConfig {
 
         // ============================ category 6: loan parameters ============================
         b.push("loan");
-        b.comment("\u8d37\u6b3e\u53c2\u6570\u3002\u4fe1\u7528\u989d\u5ea6\u6309\u73a9\u5bb6\u7684**\u5386\u53f2\u6700\u9ad8\u7b49\u7ea7** highestLevel \u53d6\u503c\uff1b \u501f\u6b3e\u8d44\u683c\u4e3a highestLevel >= 2\uff08\u7b49\u7ea7 2 \u95e8\u69db\u89c1\u5206\u7c7b\u4e00\uff0c\u4e0d\u786c\u7f16\u7801\uff09\u3002 \u5355\u5229\u8ba1\u606f\uff1a\u6bcf\u5929\u5229\u606f = \u672c\u91d1 \u00d7 loanDailyInterestPercent%\u3002 \u5df2\u6709\u8d37\u6b3e\u9501\u5b9a\u7684\u662f**\u501f\u6b3e\u5f53\u65f6**\u7684\u5229\u7387\u3001\u671f\u9650\u4e0e\u5229\u606f\u4e0a\u9650\u500d\u6570\uff0c\u6539\u914d\u7f6e\u53ea\u5f71\u54cd\u65b0\u8d37\u6b3e\u3002 | Loans. Credit limit is taken from each player's historical highest level; eligibility is highestLevel >= 2  (the level-2 gate comes from category 1, never hardcoded). Simple interest: daily interest = principal x loanDailyInterestPercent%.  Existing loans keep the rate, term and interest-cap multiplier from when they were borrowed; edits affect new loans only.")
+        b.comment("\u8d37\u6b3e\u53c2\u6570\u3002\u4fe1\u7528\u989d\u5ea6\u6309\u73a9\u5bb6\u7684**\u5386\u53f2\u6700\u9ad8\u7b49\u7ea7** "
+                + "highestLevel \u53d6\u503c\uff1b \u501f\u6b3e\u8d44\u683c\u4e3a highestLevel >= 2\uff08\u7b49\u7ea7 2 "
+                + "\u95e8\u69db\u5728\u7b49\u7ea7\u89e3\u9501\u53c2\u6570\u4e2d\u914d\u7f6e\uff0c\u4e0d\u786c\u7f16\u7801\uff09\u3002 "
+                + "\u5355\u5229\u8ba1\u606f\uff1a\u6bcf\u5929\u5229\u606f = \u672c\u91d1 \u00d7 loanDailyInterestPercent%\u3002 "
+                + "\u5df2\u6709\u8d37\u6b3e\u9501\u5b9a\u7684\u662f**\u501f\u6b3e\u5f53\u65f6**\u7684\u5229\u7387\u3001\u671f\u9650\u4e0e\u5229\u606f\u4e0a\u9650"
+                + "\u500d\u6570\uff0c\u6539\u914d\u7f6e\u53ea\u5f71\u54cd\u65b0\u8d37\u6b3e\u3002 | Loans. Credit limit "
+                + "is taken from each player's historical highest level; eligibility is highestLevel >= 2  (the level-2 "
+                + "gate comes from the level unlock thresholds, never hardcoded). Simple interest: daily interest = principal "
+                + "x loanDailyInterestPercent%.  Existing loans keep the rate, term and interest-cap multiplier from when "
+                + "they were borrowed; edits affect new loans only.")
                 ;
         CREDIT_LIMIT_LEVEL2 = b.comment("\u7b49\u7ea7 2 \u7684\u4fe1\u7528\u989d\u5ea6\uff08\u77ff\u5e01\uff09\u3002\u9ed8\u8ba4 200\u3002\u8303\u56f4 0~1000000\u3002 | Credit limit at level 2 (coins). Default 200. Range 0~1000000.")
                 .defineInRange("creditLimitLevel2", 200L, 0L, 1_000_000L);
@@ -692,7 +733,11 @@ public final class OreMarketConfig {
         b.push("trade");
         b.comment("\u4ea4\u6613\u53c2\u6570\u3002\u624b\u7eed\u8d39\u6309\u6210\u4ea4\u989d\u767e\u5206\u6bd4\u6536\u53d6\uff1b\u6da8\u8dcc\u505c\u9650\u5236\u5355\u4e2a marketTick \u7684\u6700\u5927\u6da8\u8dcc\u5e45\uff1b \u521d\u59cb\u77ff\u5e01\u53ea\u5728\u73a9\u5bb6\u7b2c\u4e00\u6b21\u8fdb\u5165\u670d\u52a1\u5668\u65f6\u53d1\u653e\u4e00\u6b21\uff0c\u4e14\u4e0d\u8bb0\u5165\u77ff\u5e01\u5cf0\u503c\u3002 | Trading. Fee is a percent of turnover; price limits cap one marketTick's move;  starting coins are granted once on a player's first join and never count toward the peak.")
                 ;
-        TRADE_FEE_PERCENT = b.comment("\u4e70\u5356\u624b\u7eed\u8d39\uff08\u6210\u4ea4\u989d\u7684\u767e\u5206\u6bd4\uff09\u3002\u9ed8\u8ba4 0.5\u3002\u8303\u56f4 0~10\u3002 \u4e8b\u4ef6\uff08\u5206\u7c7b\u4e5d\uff09\u4f1a\u5728\u6210\u4ea4\u5f53\u65f6\u628a\u624b\u7eed\u8d39\u7387\u4e0a\u4e0b\u6d6e\u52a8\uff0c\u6d6e\u52a8\u7ed3\u679c\u540c\u6837\u94b3\u8fdb 0~10\uff0c \u8d85\u8fc7 10 \u7684\u914d\u7f6e\u503c\u4f1a\u88ab\u538b\u56de 10\u3002 | Trade fee in percent of turnover. Default 0.5. Range 0~10. Event modifiers (category 9) swing it at fill time and the result is clamped to 0~10 as well.")
+        TRADE_FEE_PERCENT = b.comment("\u4e70\u5356\u624b\u7eed\u8d39\uff08\u6210\u4ea4\u989d\u7684\u767e\u5206\u6bd4\uff09\u3002\u9ed8\u8ba4 "
+                + "0.5\u3002\u8303\u56f4 0~10\u3002 \u968f\u673a\u4e8b\u4ef6\u4f1a\u5728\u6210\u4ea4\u5f53\u65f6\u628a\u624b\u7eed\u8d39\u7387\u4e0a\u4e0b\u6d6e"
+                + "\u52a8\uff0c\u6d6e\u52a8\u7ed3\u679c\u540c\u6837\u94b3\u8fdb 0~10\uff0c \u8d85\u8fc7 10 \u7684\u914d\u7f6e\u503c\u4f1a\u88ab\u538b\u56de "
+                + "10\u3002 | Trade fee in percent of turnover. Default 0.5. Range 0~10. Event modifiers swing it at fill "
+                + "time and the result is clamped to 0~10 as well.")
                 .defineInRange("tradeFeePercent", 0.5, 0.0, 10.0);
         PRICE_LIMIT_PERCENT = b.comment("\u5355 marketTick \u6da8\u8dcc\u505c\u5e45\u5ea6\uff08\u767e\u5206\u6bd4\uff09\u3002\u9ed8\u8ba4 10\u3002\u914d\u7f6e\u8303\u56f4 1~50\uff0c \u4f46\u4e8b\u4ef6\u805a\u5408\u5c42\u628a\u6bcf\u80a1\u751f\u6548\u503c\u94b3\u8fdb 5~25\uff08MarketModifiers.finish \u7684 0.05~0.25\uff09\uff0c \u56e0\u6b64\u5c0f\u4e8e 5 \u6309 5 \u751f\u6548\u3001\u5927\u4e8e 25 \u6309 25 \u751f\u6548\uff1b\u4e8b\u4ef6\u7684\u6b63\u8d1f delta \u4e5f\u5728\u8fd9\u9053\u94b3\u5236\u4e4b\u5185\u3002 | Price-limit width per marketTick, in percent. Configured range 1~50, but the effective per-stock value is clamped to 5~25 by the event aggregation layer, so below 5 acts as 5 and above 25 acts as 25; event deltas are inside the same clamp.")
                 .defineInRange("priceLimitPercent", 10.0, 1.0, 50.0);
@@ -885,7 +930,21 @@ b.pop();
                 ;
         DYNAMIC_LISTING_ENABLED = b.comment("\u662f\u5426\u542f\u7528\u968f\u673a\u80a1\u7968\u81ea\u52a8\u4e0a\u5e02\u3002\u9ed8\u8ba4 true\uff1b\u8bbe\u4e3a false \u540e\u4e0d\u518d\u81ea\u52a8\u65b0\u589e\u52a8\u6001\u80a1\u7968\uff08\u5df2\u6709\u52a8\u6001\u80a1\u7968\u4ecd\u53ef\u9000\u5e02\uff09\u3002 | Enable automatic random stock listings. Default true; false stops new dynamic listings (existing ones may still delist).")
                 .define("enabled", true);
-        BUILTIN_DYNAMIC_LISTING = b.comment("\u9ed8\u8ba4 8 \u53ea\u5185\u7f6e\u80a1\u7968\uff08\u7164\u70ad\u2026\u4e0b\u754c\u5408\u91d1\uff09\u662f\u5426\u53c2\u4e0e\u52a8\u6001\u4e0a\u5e02\u9000\u5e02\u3002\u9ed8\u8ba4 false\uff1a\u5185\u7f6e\u80a1\u7968\u6c38\u8fdc\u4e0a\u5e02\u3001\u4e0d\u4f1a\u88ab\u81ea\u52a8\u9000\u5e02\u3002\u8bbe\u4e3a true\uff1a\u5185\u7f6e\u80a1\u7968\u8fde\u7eed delistConsecutiveDays \u4e2a\u4ea4\u6613\u65e5\u4ef7\u683c\u4f4e\u4e8e\u57fa\u51c6\u4ef7 delistThresholdPercent% \u65f6\u9000\u5e02\uff08\u6301\u4ed3\u51bb\u7ed3\u4e0d\u6e05\u7b97\u3001\u64a4\u9500\u5176\u6302\u5355\u3001\u5f3a\u5e73\u5176\u7a7a\u4ed3\u3001\u7ed3\u675f\u5176\u4e8b\u4ef6\uff09\uff0c\u95f4\u9694 relistIntervalDays \u4e2a\u4ea4\u6613\u65e5\u540e\u6309\u914d\u7f6e\u57fa\u51c6\u4ef7\u91cd\u65b0\u4e0a\u5e02\u5e76\u91cd\u8dd1\u9996\u65e5\u6ce2\u52a8\u3002\u5f00\u5173\u5173\u95ed\u65f6\u5df2\u9000\u5e02\u7684\u5185\u7f6e\u80a1\u7968\u4f1a\u81ea\u52a8\u6062\u590d\u4e0a\u5e02\u3002\u914d\u7f6e\u5206\u7c7b\u5341\u7684\u81ea\u5b9a\u4e49\u80a1\u7968\u4e0d\u53d7\u672c\u5f00\u5173\u5f71\u54cd\uff1a\u5b83\u4eec\u59cb\u7ec8\u4ee5\u914d\u7f6e\u6587\u4ef6\u4e3a\u51c6\uff0c\u4e0d\u4f1a\u88ab\u81ea\u52a8\u9000\u5e02\u3002 | Whether the 8 built-in default stocks (coal..netherite) take part in dynamic listing/delisting. Default false: built-ins always stay listed and never auto-delist. When true: a built-in closing below delistThresholdPercent% of its base price for delistConsecutiveDays consecutive trading days delists (holdings frozen, not liquidated; its orders cancelled, shorts force-closed, events ended), then relists at its configured base price after relistIntervalDays trading days with a fresh first-day move. Turning this off restores any delisted built-in to listing immediately. Custom stocks from category ten are unaffected: they always follow the config file and never auto-delist.")
+        BUILTIN_DYNAMIC_LISTING = b.comment("\u9ed8\u8ba4 8 \u53ea\u5185\u7f6e\u80a1\u7968\uff08\u7164\u70ad\u2026\u4e0b\u754c\u5408\u91d1\uff09\u662f\u5426\u53c2\u4e0e\u52a8\u6001\u4e0a"
+                + "\u5e02\u9000\u5e02\u3002\u9ed8\u8ba4 false\uff1a\u5185\u7f6e\u80a1\u7968\u6c38\u8fdc\u4e0a\u5e02\u3001\u4e0d\u4f1a\u88ab\u81ea\u52a8\u9000\u5e02"
+                + "\u3002\u8bbe\u4e3a true\uff1a\u5185\u7f6e\u80a1\u7968\u8fde\u7eed delistConsecutiveDays \u4e2a\u4ea4\u6613\u65e5\u4ef7\u683c\u4f4e\u4e8e\u57fa"
+                + "\u51c6\u4ef7 delistThresholdPercent% \u65f6\u9000\u5e02\uff08\u6301\u4ed3\u51bb\u7ed3\u4e0d\u6e05\u7b97\u3001\u64a4\u9500\u5176\u6302\u5355\u3001"
+                + "\u5f3a\u5e73\u5176\u7a7a\u4ed3\u3001\u7ed3\u675f\u5176\u4e8b\u4ef6\uff09\uff0c\u95f4\u9694 relistIntervalDays "
+                + "\u4e2a\u4ea4\u6613\u65e5\u540e\u6309\u914d\u7f6e\u57fa\u51c6\u4ef7\u91cd\u65b0\u4e0a\u5e02\u5e76\u91cd\u8dd1\u9996\u65e5\u6ce2\u52a8\u3002\u5f00"
+                + "\u5173\u5173\u95ed\u65f6\u5df2\u9000\u5e02\u7684\u5185\u7f6e\u80a1\u7968\u4f1a\u81ea\u52a8\u6062\u590d\u4e0a\u5e02\u3002\u914d\u7f6e\u4e2d\u7684"
+                + "\u81ea\u5b9a\u4e49\u80a1\u7968\u4e0d\u53d7\u672c\u5f00\u5173\u5f71\u54cd\uff1a\u5b83\u4eec\u59cb\u7ec8\u4ee5\u914d\u7f6e\u6587\u4ef6\u4e3a\u51c6"
+                + "\uff0c\u4e0d\u4f1a\u88ab\u81ea\u52a8\u9000\u5e02\u3002 | Whether the 8 built-in default stocks (coal..netherite) "
+                + "take part in dynamic listing/delisting. Default false: built-ins always stay listed and never auto-delist. "
+                + "When true: a built-in closing below delistThresholdPercent% of its base price for delistConsecutiveDays "
+                + "consecutive trading days delists (holdings frozen, not liquidated; its orders cancelled, shorts force-closed, "
+                + "events ended), then relists at its configured base price after relistIntervalDays trading days with a "
+                + "fresh first-day move. Turning this off restores any delisted built-in to listing immediately. Custom "
+                + "stocks are unaffected: they always follow the config file and never auto-delist.")
                 .define("builtinDynamicListing", false);
         DYNAMIC_UNLOCK_LEVEL = b.comment("\u52a8\u6001\u4e0a\u5e02\u80a1\u7968\u7684\u9ed8\u8ba4\u89e3\u9501\u7b49\u7ea7\u3002\u9ed8\u8ba4 1\u3002\u8303\u56f4 1~4\u3002\u5019\u9009\u6c60\u5355\u884c\u7b2c 5 \u6bb5\u53ef\u8986\u76d6\u9ed8\u8ba4\u503c\u3002 | Default unlock level for dynamically listed stocks. Default 1. Range 1~4. The 5th field of a candidate line may override it.")
                 .defineInRange("unlockLevel", 1, 1, 4);
@@ -963,8 +1022,30 @@ b.pop();
         // Every key is a 0xRRGGBB integer (decimal or 0x hex both accepted); an opaque alpha is added automatically at use.
         // The server value ships with the config snapshot so all client screens share one palette; saving applies it live (next frame).
         b.push("uiTheme");
-        b.comment("\u754c\u9762\u4e3b\u9898\u914d\u8272\uff08\u5206\u7c7b\u4e8c\u5341\uff09\uff1a24 \u4f4d RGB \u6574\u6570\uff08\u5982 0xFF6F6F \u6216 16741231\uff09\uff0c\u81ea\u52a8\u4e0d\u900f\u660e\u3002",
-                "UI theme colors (category 20): 24-bit RGB integers (e.g. 0xFF6F6F or 16741231), forced opaque.");
+        b.comment("\u754c\u9762\u4e3b\u9898\u914d\u8272\uff1a24 \u4f4d RGB \u6574\u6570\uff08\u5982 0xFF6F6F \u6216 16741231\uff09\uff0c\u81ea\u52a8\u4e0d\u900f\u660e\u3002",
+                "UI theme colors: 24-bit RGB integers (e.g. 0xFF6F6F or 16741231), forced opaque.");
+        UI_COLOR_SCHEME = b.comment(
+                "\u6da8\u8dcc\u914d\u8272\u65b9\u6848\uff1aRED_UP = \u7ea2\u6da8\u7eff\u8dcc\uff08A \u80a1\u4e60\u60ef\uff0c\u9ed8\u8ba4\uff09\uff1bGREEN_UP = \u7eff\u6da8\u7ea2\u8dcc\uff08\u7f8e\u80a1\u4e60\u60ef\uff09\u3002",
+                "\u5207\u6362\u540e\u884c\u60c5\u6da8\u8dcc\u3001\u76c8\u4e8f\u3001\u9633\u9634\u7ebf\u5b9e\u4f53\u4e0e\u5f71\u7ebf\u3001\u4e70\u5356\u65b9\u5411\u3001\u4e8b\u4ef6\u591a\u7a7a\u548c\u547d\u4ee4\u884c\u60c5\u540c\u65f6\u53d8\u8272\uff1b\u8b66\u544a\u4e0e\u9519\u8bef\u4fdd\u6301\u7ea2\u8272\u3002",
+                "Rising/falling colour convention: RED_UP = red rises (A-share habit, default), GREEN_UP = green rises (US habit).",
+                "The switch repaints quotes, P&L, candle bodies and wicks, buy/sell direction, event tone and chat quotes together.")
+                .defineEnum("colorScheme", ColorScheme.RED_UP);
+        UI_LOG_COLOR_SCHEME = b.comment(
+                "\u65e5\u5fd7\u4e70\u5356\u914d\u8272\uff1aBUY_GREEN = \u4e70\u5165\u7eff\u3001\u5356\u51fa\u7ea2\uff08\u9ed8\u8ba4\uff09\uff1b",
+                "BUY_RED = \u4e70\u5165\u7ea2\u3001\u5356\u51fa\u7eff\uff1bFOLLOW_MARKET = \u8ddf\u968f\u4e0a\u9762\u7684\u6da8\u8dcc\u914d\u8272\u3002",
+                "\u53ea\u6539\u65e5\u5fd7\u9875\u524d\u7f00\u989c\u8272\uff0c\u4e0d\u5f71\u54cd\u884c\u60c5\u3001\u76c8\u4e8f\u3001K \u7ebf\u4e0e\u76d8\u53e3\u65b9\u5411\u8272\u3002",
+                "Trade-log prefix colours: BUY_GREEN = green buy / red sell (default), BUY_RED = red buy / green sell.",
+                "FOLLOW_MARKET reconnects the two prefixes to the rising/falling convention above.",
+                "Only the log page moves; quotes, P&L, candles and the order book keep the colour scheme above.")
+                .defineEnum("logColorScheme", LogColorScheme.BUY_GREEN);
+        UI_LOG_BUY_RGB = b.comment(
+                "\u65e5\u5fd7\u4e70\u5165\u524d\u7f00\u8272\uff08\u9ed8\u8ba4 0x3FBF5F \u7eff\uff09\u3002",
+                "FOLLOW_MARKET \u4e0b\u6b64\u503c\u4e0d\u53c2\u4e0e\u7ed8\u5236\u3002 | Log buy prefix (default 0x3FBF5F green); unused under FOLLOW_MARKET.")
+                .defineInRange("logBuy", 0x3FBF5F, 0, 0xFFFFFF);
+        UI_LOG_SELL_RGB = b.comment(
+                "\u65e5\u5fd7\u5356\u51fa\u524d\u7f00\u8272\uff08\u9ed8\u8ba4 0xE04A4A \u7ea2\uff09\u3002",
+                "FOLLOW_MARKET \u4e0b\u6b64\u503c\u4e0d\u53c2\u4e0e\u7ed8\u5236\u3002 | Log sell prefix (default 0xE04A4A red); unused under FOLLOW_MARKET.")
+                .defineInRange("logSell", 0xE04A4A, 0, 0xFFFFFF);
         UI_PANEL_ROOT_RGB = b.comment("\u6839\u9762\u677f\u4e0e K \u7ebf\u63cf\u8fb9\u5e95\u8272\uff08\u9ed8\u8ba4 0x1A1A1A\uff09\u3002 | Root panel & candle-stick stroke base (default 0x1A1A1A).").defineInRange("panelRoot", 0x1A1A1A, 0, 0xFFFFFF);
         UI_PANEL_SOFT_RGB = b.comment("\u5206\u533a\u9762\u677f/\u4e8b\u4ef6\u680f/\u5361\u7247\u5e95\u8272\uff08\u9ed8\u8ba4 0x2B2B2B\uff09\u3002 | Section panel / event bar / card background (default 0x2B2B2B).").defineInRange("panelSoft", 0x2B2B2B, 0, 0xFFFFFF);
         UI_PANEL_ROW_RGB = b.comment("\u884c\u5206\u9694\u7ebf\u4e0e\u901a\u7528\u6309\u94ae\u5e95\u8272\uff08\u9ed8\u8ba4 0x3A3A3A\uff09\u3002 | Row separators & generic button background (default 0x3A3A3A).").defineInRange("panelRow", 0x3A3A3A, 0, 0xFFFFFF);
@@ -976,11 +1057,23 @@ b.pop();
         UI_MUTED_RGB = b.comment("\u6b21\u8981\u6587\u5b57\u4e0e\u6a2a\u7ebf\u3001\u6301\u5e73\u8721\u70db\u5b9e\u4f53\uff08\u9ed8\u8ba4 0xAAAAAA\uff09\u3002 | Muted text, separators, flat candles (default 0xAAAAAA).").defineInRange("muted", 0xAAAAAA, 0, 0xFFFFFF);
         UI_GRAY_RGB = b.comment("\u7070\u5b57\u3001\u672a\u89e3\u9501\u5706\u70b9\u3001\u6301\u5e73\u5f71\u7ebf\uff08\u9ed8\u8ba4 0x888888\uff09\u3002 | Grey text, locked dots, flat wicks (default 0x888888).").defineInRange("gray", 0x888888, 0, 0xFFFFFF);
         UI_DIM_RGB = b.comment("\u6df1\u7070\u5b57\u4e0e\u6eda\u52a8\u6761\u6ed1\u5757\uff08\u9ed8\u8ba4 0x666666\uff09\u3002 | Dim text and scrollbar thumbs (default 0x666666).").defineInRange("dim", 0x666666, 0, 0xFFFFFF);
-        UI_QUOTE_UP_RGB = b.comment("\u884c\u60c5\u4e0a\u6da8\u6587\u5b57\u8272\uff08\u9ed8\u8ba4 0xFF6F6F\uff0c\u7ea2\u6da8\uff09\u3002 | Rising quote text (default 0xFF6F6F, red-up).").defineInRange("quoteUp", 0xFF6F6F, 0, 0xFFFFFF);
-        UI_QUOTE_DOWN_RGB = b.comment("\u884c\u60c5\u4e0b\u8dcc\u6587\u5b57\u8272\uff08\u9ed8\u8ba4 0x6FE06F\uff0c\u7eff\u8dcc\uff09\u3002 | Falling quote text (default 0x6FE06F, green-down).").defineInRange("quoteDown", 0x6FE06F, 0, 0xFFFFFF);
+        UI_QUOTE_UP_RGB = b.comment("\u884c\u60c5\u4e0a\u6da8\u6587\u5b57\u8272\uff08\u9ed8\u8ba4 0xFF6F6F\uff0c\u7ea2\u6da8\uff09\u3002",
+                "\u5f00\u542f GREEN_UP \u540e\u6b64\u503c\u7528\u4e8e\u4e0b\u8dcc\u6587\u5b57\u3002",
+                "Rising quote text (default 0xFF6F6F, red-up); under GREEN_UP this value paints falling text instead.")
+                .defineInRange("quoteUp", 0xFF6F6F, 0, 0xFFFFFF);
+        UI_QUOTE_DOWN_RGB = b.comment("\u884c\u60c5\u4e0b\u8dcc\u6587\u5b57\u8272\uff08\u9ed8\u8ba4 0x6FE06F\uff0c\u7eff\u8dcc\uff09\u3002",
+                "\u5f00\u542f GREEN_UP \u540e\u6b64\u503c\u7528\u4e8e\u4e0a\u6da8\u6587\u5b57\u3002",
+                "Falling quote text (default 0x6FE06F, green-down); under GREEN_UP this value paints rising text instead.")
+                .defineInRange("quoteDown", 0x6FE06F, 0, 0xFFFFFF);
         UI_QUOTE_FLAT_RGB = b.comment("\u884c\u60c5\u5e73\u76d8\u6587\u5b57\u8272\uff08\u9ed8\u8ba4 0xBDBDBD\uff09\u3002 | Flat quote text (default 0xBDBDBD).").defineInRange("quoteFlat", 0xBDBDBD, 0, 0xFFFFFF);
-        UI_PNL_UP_RGB = b.comment("\u76c8\u5229\u4e0e\u9633\u7ebf\u5b9e\u4f53\u8272\uff08\u9ed8\u8ba4 0xE04A4A\uff09\u3002 | Profit & bull candle body (default 0xE04A4A).").defineInRange("pnlUp", 0xE04A4A, 0, 0xFFFFFF);
-        UI_PNL_DOWN_RGB = b.comment("\u4e8f\u635f\u4e0e\u9634\u7ebf\u5b9e\u4f53\u8272\uff08\u9ed8\u8ba4 0x3FBF5F\uff09\u3002 | Loss & bear candle body (default 0x3FBF5F).").defineInRange("pnlDown", 0x3FBF5F, 0, 0xFFFFFF);
+        UI_PNL_UP_RGB = b.comment("\u76c8\u5229\u4e0e\u9633\u7ebf\u5b9e\u4f53\u8272\uff08\u9ed8\u8ba4 0xE04A4A\uff09\u3002",
+                "\u5f00\u542f GREEN_UP \u540e\u6b64\u503c\u7528\u4e8e\u4e8f\u635f\u4e0e\u9634\u7ebf\u3002",
+                "Profit & bull candle body (default 0xE04A4A); under GREEN_UP it paints loss and bear candles instead.")
+                .defineInRange("pnlUp", 0xE04A4A, 0, 0xFFFFFF);
+        UI_PNL_DOWN_RGB = b.comment("\u4e8f\u635f\u4e0e\u9634\u7ebf\u5b9e\u4f53\u8272\uff08\u9ed8\u8ba4 0x3FBF5F\uff09\u3002",
+                "\u5f00\u542f GREEN_UP \u540e\u6b64\u503c\u7528\u4e8e\u76c8\u5229\u4e0e\u9633\u7ebf\u3002",
+                "Loss & bear candle body (default 0x3FBF5F); under GREEN_UP it paints profit and bull candles instead.")
+                .defineInRange("pnlDown", 0x3FBF5F, 0, 0xFFFFFF);
         UI_SELECTED_RGB = b.comment("\u5217\u8868\u9009\u4e2d\u884c\u9ed8\u8ba4\u5e95\u8272\uff08\u9ed8\u8ba4 0x4A5A7A\uff1b\u4ea4\u6613\u6240\u884c\u4ecd\u4f18\u5148\u7528 exchangeRowSelectedColor\uff09\u3002 | Default selected row background (0x4A5A7A; exchange rows prefer exchangeRowSelectedColor).").defineInRange("selected", 0x4A5A7A, 0, 0xFFFFFF);
         UI_HOVER_RGB = b.comment("\u60ac\u505c\u5e95\u8272\uff08\u9ed8\u8ba4 0x404040\uff09\u3002 | Hover background (default 0x404040).").defineInRange("hover", 0x404040, 0, 0xFFFFFF);
         UI_BLUE_RGB = b.comment("\u9009\u4e2d\u6807\u7b7e\u4e0e\u53d6\u56de\u6309\u94ae\u5e95\u8272\uff08\u9ed8\u8ba4 0x3A3A5A\uff09\u3002 | Selected tab & withdraw button (default 0x3A3A5A).").defineInRange("blue", 0x3A3A5A, 0, 0xFFFFFF);
@@ -998,8 +1091,14 @@ b.pop();
         UI_TEXT_SOFT_RGB = b.comment("\u672a\u9009\u5b50\u6807\u7b7e\u6587\u5b57\u8272\uff08\u9ed8\u8ba4 0xC9C9D9\uff09\u3002 | Inactive sub-tab text (default 0xC9C9D9).").defineInRange("textSoft", 0xC9C9D9, 0, 0xFFFFFF);
         UI_TIP_TEXT_RGB = b.comment("\u4e8b\u4ef6\u8be6\u60c5\u6b63\u6587\u4e0e\u56fe\u8868\u6570\u503c\u8272\uff08\u9ed8\u8ba4 0xE8E8E8\uff09\u3002 | Event detail & chart info text (default 0xE8E8E8).").defineInRange("tipText", 0xE8E8E8, 0, 0xFFFFFF);
         UI_BODY_TEXT_RGB = b.comment("\u65e5\u5fd7\u4e0e\u4e8b\u4ef6\u8bf4\u660e\u6587\u5b57\u8272\uff08\u9ed8\u8ba4 0xCCCCCC\uff09\u3002 | Log & event description text (default 0xCCCCCC).").defineInRange("bodyText", 0xCCCCCC, 0, 0xFFFFFF);
-        UI_WICK_UP_RGB = b.comment("\u9633\u7ebf\u5f71\u7ebf\u8272\uff08\u9ed8\u8ba4 0xCC3A3A\uff0c\u6bd4\u5b9e\u4f53\u6df1\u4e00\u6863\uff09\u3002 | Bull candle wick (default 0xCC3A3A).").defineInRange("wickUp", 0xCC3A3A, 0, 0xFFFFFF);
-        UI_WICK_DOWN_RGB = b.comment("\u9634\u7ebf\u5f71\u7ebf\u8272\uff08\u9ed8\u8ba4 0x2F9F4F\uff09\u3002 | Bear candle wick (default 0x2F9F4F).").defineInRange("wickDown", 0x2F9F4F, 0, 0xFFFFFF);
+        UI_WICK_UP_RGB = b.comment("\u9633\u7ebf\u5f71\u7ebf\u8272\uff08\u9ed8\u8ba4 0xCC3A3A\uff0c\u6bd4\u5b9e\u4f53\u6df1\u4e00\u6863\uff09\u3002",
+                "\u5f00\u542f GREEN_UP \u540e\u6b64\u503c\u7528\u4e8e\u9634\u7ebf\u5f71\u7ebf\u3002",
+                "Bull candle wick (default 0xCC3A3A); under GREEN_UP it paints bear wicks instead.")
+                .defineInRange("wickUp", 0xCC3A3A, 0, 0xFFFFFF);
+        UI_WICK_DOWN_RGB = b.comment("\u9634\u7ebf\u5f71\u7ebf\u8272\uff08\u9ed8\u8ba4 0x2F9F4F\uff09\u3002",
+                "\u5f00\u542f GREEN_UP \u540e\u6b64\u503c\u7528\u4e8e\u9633\u7ebf\u5f71\u7ebf\u3002",
+                "Bear candle wick (default 0x2F9F4F); under GREEN_UP it paints bull wicks instead.")
+                .defineInRange("wickDown", 0x2F9F4F, 0, 0xFFFFFF);
         UI_BUTTON_HOVER_RGB = b.comment("\u901a\u7528\u6309\u94ae\u60ac\u505c\u5e95\u8272\uff08\u9ed8\u8ba4 0x4E4E4E\uff09\u3002 | Generic button hover background (default 0x4E4E4E).").defineInRange("buttonHover", 0x4E4E4E, 0, 0xFFFFFF);
         UI_DEPOSIT_HOVER_RGB = b.comment("\u5b58\u5165\u6309\u94ae\u60ac\u505c\u5e95\u8272\uff08\u9ed8\u8ba4 0x3F7A50\uff09\u3002 | Deposit button hover background (default 0x3F7A50).").defineInRange("depositHover", 0x3F7A50, 0, 0xFFFFFF);
         UI_WITHDRAW_HOVER_RGB = b.comment("\u53d6\u56de\u6309\u94ae\u60ac\u505c\u5e95\u8272\uff08\u9ed8\u8ba4 0x50507A\uff09\u3002 | Withdraw button hover background (default 0x50507A).").defineInRange("withdrawHover", 0x50507A, 0, 0xFFFFFF);
@@ -1014,8 +1113,8 @@ b.pop();
 
         // ============================ category 21: screen feel ============================
         b.push("uiBehavior");
-        b.comment("\u754c\u9762\u6eda\u52a8/\u62d6\u52a8/\u52a8\u753b\u624b\u611f\uff08\u5206\u7c7b\u4e8c\u5341\u4e00\uff09\uff0c\u5168\u90e8\u5ba2\u6237\u7aef\u5373\u65f6\u751f\u6548\u3002",
-                "UI scroll / drag / animation feel (category 21), applied client-side instantly.");
+        b.comment("\u754c\u9762\u6eda\u52a8/\u62d6\u52a8/\u52a8\u753b\u624b\u611f\uff0c\u5168\u90e8\u5ba2\u6237\u7aef\u5373\u65f6\u751f\u6548\u3002",
+                "UI scroll / drag / animation feel, applied client-side instantly.");
         UI_SCROLL_STEP = b.comment("\u6eda\u8f6e\u4e00\u683c\u6eda\u52a8\u50cf\u7d20\uff08\u4e3b\u5217\u8868\uff0c\u9ed8\u8ba4 20\uff09\u3002\u8303\u56f4 2~100\u3002 | Wheel scroll step in px for main lists (default 20). Range 2~100.").defineInRange("scrollStep", 20, 2, 100);
         UI_SCROLL_STEP_FINE = b.comment("\u6eda\u8f6e\u4e00\u683c\u6eda\u52a8\u50cf\u7d20\uff08\u4e8b\u4ef6\u5361\u8be6\u60c5/\u9519\u8bef\u63d0\u793a/\u60ac\u6d6e\u5c0f\u7a97\uff0c\u9ed8\u8ba4 10\uff09\u3002\u8303\u56f4 2~50\u3002 | Fine wheel step (event detail, toast, tooltip; default 10). Range 2~50.").defineInRange("scrollStepFine", 10, 2, 50);
         UI_DRAG_THRESHOLD_PX = b.comment("\u6309\u4f4f\u62d6\u52a8\u5224\u5b9a\u9608\u503c\uff08\u50cf\u7d20\uff0c\u9ed8\u8ba4 5\uff09\uff1a\u6309\u4e0b\u540e\u4f4d\u79fb\u8d85\u8fc7\u8be5\u503c\u89c6\u4e3a\u62d6\u52a8\u3001\u4e0d\u89e6\u53d1\u70b9\u51fb\u3002\u8303\u56f4 0~50\u3002 | Press-drag threshold in px (default 5): moving beyond it drags instead of clicking. Range 0~50.").defineInRange("dragThresholdPx", 5, 0, 50);
@@ -1030,7 +1129,7 @@ b.pop();
         // ============================ category 22: trade, event and chart safety settings ============================
         b.push("gameplayLimits");
         b.comment("\u4ea4\u6613\u3001\u4e8b\u4ef6\u4e0e K \u7ebf\u663e\u793a\u8bbe\u7f6e\uff08\u4e0d\u542b\u8d37\u6b3e\u989d\u5ea6\uff09\uff0c\u670d\u52a1\u7aef\u6743\u5a01\u5e76\u540c\u6b65\u7ed9\u5ba2\u6237\u7aef\u6821\u9a8c\u3002",
-                "Trade, event and chart safety settings (category 22); these caps do not limit loan credit lines; values are server-authoritative and synced for client checks.");
+                "Trade, event and chart safety settings; these caps do not limit loan credit lines; values are server-authoritative and synced for client checks.");
         MAX_TRADE_QUANTITY = b.comment("\u5355\u7b14\u5e02\u4ef7/\u6302\u5355/\u9650\u4ef7/\u505a\u7a7a\u7684\u6700\u5927\u6570\u91cf\uff08\u9ed8\u8ba4 1000000\uff09\u3002\u8303\u56f4 1~100000000\u3002 | Max quantity per market/limit/short order (default 1000000). Range 1~100000000.").defineInRange("maxTradeQuantity", 1000000, 1, 100000000);
         LOG_MAX_ENTRIES = b.comment("\u6bcf\u73a9\u5bb6\u65e5\u5fd7\u6761\u6570\u4e0a\u9650\uff08\u9ed8\u8ba4 100\uff09\u3002\u8303\u56f4 10~1000\u3002 | Log entries kept per player (default 100). Range 10~1000.").defineInRange("logMaxEntries", 100, 10, 1000);
         EVENT_MAX_ACTIVE = b.comment("\u540c\u4e00\u65f6\u95f4\u6700\u591a\u751f\u6548\u4e8b\u4ef6\u6570\uff08\u9ed8\u8ba4 3\uff09\u3002\u8303\u56f4 1~10\u3002 | Max concurrently active events (default 3). Range 1~10.").defineInRange("eventMaxActive", 3, 1, 10);

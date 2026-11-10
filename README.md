@@ -41,6 +41,23 @@ Useful commands:
 
 The market is configured in `config/oremarket.toml`. Server settings are authoritative in multiplayer, so client-side values do not override the server.
 
+### Rising and falling colours
+
+`config/oremarket.toml` → `[uiTheme].colorScheme` chooses the convention:
+
+- `RED_UP` (default): red means rising or profit, green means falling or loss (A-share style).
+- `GREEN_UP`: green means rising or profit, red means falling or loss (US-stock style).
+
+The server pushes the choice to every client, so the whole market palette stays consistent. The switch repaints quote changes, P&L, candle bodies and wicks, order-book and limit-order direction labels, event tone bars, and `/oremarket price` chat output. Warning, error and rarity colours never move.
+
+The trade-log prefixes have their own switch in `config/oremarket.toml` → `[uiTheme].logColorScheme`:
+
+- `BUY_GREEN` (default): 买入绿、卖出红
+- `BUY_RED`: 买入红、卖出绿
+- `FOLLOW_MARKET`: 日志买卖前缀跟随上面的 `colorScheme`
+
+`[uiTheme].logBuy` and `[uiTheme].logSell` customize the two fixed log colours; they are ignored by `FOLLOW_MARKET`. The server sends both settings to clients. Save the file and run `/oremarket config reload` as an operator to apply changes without restarting.
+
 ## Notes
 
 This is a beta release. The economy is deliberately configurable; server owners should review prices, fees, loan settings, and event frequency before starting a long-running world.

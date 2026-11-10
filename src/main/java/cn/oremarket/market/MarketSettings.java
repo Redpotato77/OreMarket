@@ -339,6 +339,12 @@ public final class MarketSettings {
             UI_DEPOSIT_HOVER = 36, UI_WITHDRAW_HOVER = 37, UI_WARNING = 38, UI_HINT_GRAY = 39,
             UI_GOLD_TEXT = 40, UI_CHIP_BLUE = 41, UI_ACCENT_ORANGE = 42, UI_COIN_DARK = 43,
             UI_COIN_LIGHT = 44;
+    /**
+     * The trade-log pair extends the palette at the tail, so every pre-existing slot index keeps its wire meaning.
+     * The values derive from the last legacy slot instead of hard-coded numbers: appending a theme key can never
+     * silently reuse an index.
+     */
+    public static final int UI_LOG_BUY = UI_COIN_LIGHT + 1, UI_LOG_SELL = UI_COIN_LIGHT + 2;
 
     private static final int[] UI_COLOR_DEFAULTS = {
             0x1A1A1A, 0x2B2B2B, 0x3A3A3A, 0x555555, 0x2A2A2A, 0x4A4A4A,
@@ -348,9 +354,16 @@ public final class MarketSettings {
             0x0D0D10, 0x888888, 0x4A7FD0, 0x9A4AD0, 0xD0A040,
             0xFFFFFF, 0xC9C9D9, 0xE8E8E8, 0xCCCCCC, 0xCC3A3A, 0x2F9F4F, 0x4E4E4E,
             0x3F7A50, 0x50507A, 0xFF5F5F, 0x9A9AA5, 0xFFE89A, 0x44506A,
-            0xFFB060, 0xB8860B, 0xDAA520
+            0xFFB060, 0xB8860B, 0xDAA520,
+            // Log prefixes are a separate pair so the trade log can stay green-buy / red-sell whatever the
+            // market convention does. Default hues match the historical BUY / SELL literals in LogType.
+            0x3FBF5F, 0xE04A4A
     };
     private final int[] uiColors;
+    /** Colour convention in force: false = red rises / green falls (A-share, the default), true = green rises / red falls (US-stock). */
+    public final boolean greenUpColorScheme;
+    /** Trade-log prefix convention; independent from {@link #greenUpColorScheme} unless it is FOLLOW_MARKET. */
+    public final OreMarketConfig.LogColorScheme logColorScheme;
     public final int uiScrollStep;
     public final int uiScrollStepFine;
     public final int uiDragThresholdPx;
@@ -755,6 +768,10 @@ public final class MarketSettings {
                     0, 0xFFFFFF, UI_COLOR_DEFAULTS[i] & 0xFFFFFF);
             uiColors[i] = 0xFF000000 | rgb;
         }
+        // ---------- category 20 continued: the rising/falling colour convention (uiColor() resolves the pairs through it)
+        greenUpColorScheme = readColorScheme(t);
+        // ---------- the trade-log prefix convention, resolved by logBuyColor / logSellColor
+        logColorScheme = readLogColorScheme(t);
         // ---------- category 21: screen feel
         uiScrollStep = clampI("uiScrollStep", has(t, "uiScrollStep", 20), 2, 100, 20);
         uiScrollStepFine = clampI("uiScrollStepFine", has(t, "uiScrollStepFine", 10), 2, 50, 10);
@@ -795,9 +812,88 @@ public final class MarketSettings {
         warnExchangeAboveBase();
     }
 
-    /** Returns the theme colour; illegal indexes safely fall back to the root panel colour. */
+    /**
+     * Returns the theme colour in force for a slot; illegal indexes safely fall back to the root panel colour.
+     *
+     * <p>Under GREEN_UP the three directional pairs are exchanged here, at the single point every consumer reads
+     * through, so quotes, P&L and candle bodies, wicks and order-book direction marks flip together; the trade-log
+     * prefixes resolve separately through {@link #logBuyColor()} / {@link #logSellColor()}. The stored array itself
+     * is never rewritten, which keeps a config sync round trip stable.</p>
+     */
     public int uiColor(int index) {
-        return index >= 0 && index < uiColors.length ? uiColors[index] : uiColors[UI_PANEL_ROOT];
+        if (index < 0 || index >= uiColors.length) {
+            return uiColors[UI_PANEL_ROOT];
+        }
+        return uiColors[directionalSlot(index)];
+    }
+
+    /** Slot of the colour actually painted for a requested slot: the rising/falling pairs trade places in GREEN_UP. */
+    private int directionalSlot(int index) {
+        if (!greenUpColorScheme) {
+            return index;
+        }
+        if (index == UI_QUOTE_UP) {
+            return UI_QUOTE_DOWN;
+        }
+        if (index == UI_QUOTE_DOWN) {
+            return UI_QUOTE_UP;
+        }
+        if (index == UI_PNL_UP) {
+            return UI_PNL_DOWN;
+        }
+        if (index == UI_PNL_DOWN) {
+            return UI_PNL_UP;
+        }
+        if (index == UI_WICK_UP) {
+            return UI_WICK_DOWN;
+        }
+        if (index == UI_WICK_DOWN) {
+            return UI_WICK_UP;
+        }
+        return index;
+    }
+
+    /** Colour painted for a rising price / positive P&L under the scheme in force. */
+    public int riseColor() {
+        return uiColor(UI_PNL_UP);
+    }
+
+    /** Colour painted for a falling price / negative P&L under the scheme in force. */
+    public int fallColor() {
+        return uiColor(UI_PNL_DOWN);
+    }
+
+    /**
+     * Trade-log BUY prefix. The log pair is a theme slot of its own, so the market's rising/falling convention
+     * leaves it alone until logColorScheme explicitly asks for FOLLOW_MARKET (then it follows the rising colour).
+     */
+    public int logBuyColor() {
+        if (logColorScheme == OreMarketConfig.LogColorScheme.FOLLOW_MARKET) {
+            return uiColor(UI_PNL_UP);
+        }
+        return uiColor(logColorScheme == OreMarketConfig.LogColorScheme.BUY_RED
+                ? UI_LOG_SELL : UI_LOG_BUY);
+    }
+
+    /** Trade-log SELL prefix; the counterpart of {@link #logBuyColor()} (the two swap in BUY_RED). */
+    public int logSellColor() {
+        if (logColorScheme == OreMarketConfig.LogColorScheme.FOLLOW_MARKET) {
+            return uiColor(UI_PNL_DOWN);
+        }
+        return uiColor(logColorScheme == OreMarketConfig.LogColorScheme.BUY_RED
+                ? UI_LOG_BUY : UI_LOG_SELL);
+    }
+
+    /**
+     * Chat style for a signed price change in server-sent text (command output, notices): the scheme decides red and
+     * green, a non-finite value is reported in grey instead of guessing a direction.
+     */
+    public net.minecraft.ChatFormatting changeStyle(double change) {
+        if (!Double.isFinite(change)) {
+            return net.minecraft.ChatFormatting.GRAY;
+        }
+        boolean falling = change < 0.0;
+        return falling == greenUpColorScheme ? net.minecraft.ChatFormatting.RED : net.minecraft.ChatFormatting.GREEN;
     }
 
     public int rarityWeight(cn.oremarket.common.Rarity rarity) {
@@ -986,6 +1082,8 @@ public final class MarketSettings {
         t.putDouble("limitOrderDeviationThreshold", OreMarketConfig.LIMIT_ORDER_DEVIATION_THRESHOLD.get());
         t.putInt("leaderboardSize", OreMarketConfig.LEADERBOARD_SIZE.get());
         t.putBoolean("leaderboardShowSelf", OreMarketConfig.LEADERBOARD_SHOW_SELF.get());
+        t.putString("uiColorScheme", cfg(OreMarketConfig.UI_COLOR_SCHEME, OreMarketConfig.ColorScheme.RED_UP));
+        t.putString("uiLogColorScheme", cfg(OreMarketConfig.UI_LOG_COLOR_SCHEME, OreMarketConfig.LogColorScheme.BUY_GREEN));
         int[] uiCfg = {
                 cfg(OreMarketConfig.UI_PANEL_ROOT_RGB, 0x1A1A1A), cfg(OreMarketConfig.UI_PANEL_SOFT_RGB, 0x2B2B2B),
                 cfg(OreMarketConfig.UI_PANEL_ROW_RGB, 0x3A3A3A), cfg(OreMarketConfig.UI_BORDER_RGB, 0x555555),
@@ -1009,8 +1107,15 @@ public final class MarketSettings {
                 cfg(OreMarketConfig.UI_WITHDRAW_HOVER_RGB, 0x50507A), cfg(OreMarketConfig.UI_WARNING_RGB, 0xFF5F5F),
                 cfg(OreMarketConfig.UI_HINT_GRAY_RGB, 0x9A9AA5), cfg(OreMarketConfig.UI_GOLD_TEXT_RGB, 0xFFE89A),
                 cfg(OreMarketConfig.UI_CHIP_BLUE_RGB, 0x44506A), cfg(OreMarketConfig.UI_ACCENT_ORANGE_RGB, 0xFFB060),
-                cfg(OreMarketConfig.UI_COIN_DARK_RGB, 0xB8860B), cfg(OreMarketConfig.UI_COIN_LIGHT_RGB, 0xDAA520)
+                cfg(OreMarketConfig.UI_COIN_DARK_RGB, 0xB8860B), cfg(OreMarketConfig.UI_COIN_LIGHT_RGB, 0xDAA520),
+                // The trade-log pair sits at the tail so every pre-existing slot index keeps its wire meaning.
+                cfg(OreMarketConfig.UI_LOG_BUY_RGB, 0x3FBF5F), cfg(OreMarketConfig.UI_LOG_SELL_RGB, 0xE04A4A)
         };
+        // Palette-size guard: a future theme key added on one side only would silently paint defaults forever.
+        if (uiCfg.length != UI_COLOR_DEFAULTS.length) {
+            warnOnce("uiColor.count", "the config palette has " + uiCfg.length + " colours but the snapshot defines "
+                    + UI_COLOR_DEFAULTS.length + "; the missing slots fall back to defaults (warned once)");
+        }
         for (int i = 0; i < uiCfg.length; i++) t.putInt("uiColor." + i, uiCfg[i]);
         t.putInt("uiScrollStep", cfg(OreMarketConfig.UI_SCROLL_STEP, 20));
         t.putInt("uiScrollStepFine", cfg(OreMarketConfig.UI_SCROLL_STEP_FINE, 10));
@@ -1230,6 +1335,11 @@ public final class MarketSettings {
         t.putInt("leaderboardSize", leaderboardSize);
         t.putBoolean("leaderboardShowSelf", leaderboardShowSelf);
         for (int i = 0; i < uiColors.length; i++) t.putInt("uiColor." + i, uiColors[i] & 0xFFFFFF);
+        // The raw palette travels with the convention, so the receiving side swaps once and never twice.
+        t.putString("uiColorScheme", greenUpColorScheme
+                ? OreMarketConfig.ColorScheme.GREEN_UP.name() : OreMarketConfig.ColorScheme.RED_UP.name());
+        // Same rule for the log pair: the raw slots travel, the convention travels once, the reader resolves it once.
+        t.putString("uiLogColorScheme", logColorScheme.name());
         t.putInt("uiScrollStep", uiScrollStep);
         t.putInt("uiScrollStepFine", uiScrollStepFine);
         t.putInt("uiDragThresholdPx", uiDragThresholdPx);
@@ -1540,6 +1650,12 @@ public final class MarketSettings {
         return got == null || got.trim().isEmpty() ? dflt : got.trim();
     }
 
+    /** Null-safe enum config read: an unread or missing entry falls back to the default constant's name. */
+    private static <E extends Enum<E>> String cfg(net.minecraftforge.common.ForgeConfigSpec.EnumValue<E> v, E dflt) {
+        E got = v == null ? null : v.get();
+        return got == null ? dflt.name() : got.name();
+    }
+
     /** Null-safe string-list config read (null falls back to an empty list; entries stay verbatim for the parser to validate). */
     private static List<String> cfgList(net.minecraftforge.common.ForgeConfigSpec.ConfigValue<? extends List<? extends String>> v) {
         List<? extends String> got = v == null ? null : v.get();
@@ -1562,6 +1678,42 @@ public final class MarketSettings {
         }
         String s = t.getString(key);
         return s == null || s.trim().isEmpty() ? dflt : s.trim();
+    }
+
+    /**
+     * Rising/falling colour convention of this snapshot: a missing or unknown value falls back to RED_UP (warned once).
+     * The stored uiColors array is deliberately left as configured and only read through the convention, so a snapshot
+     * that travels over SyncConfigPacket cannot be swapped a second time on the receiving side.
+     */
+    private static boolean readColorScheme(CompoundTag t) {
+        String scheme = hasString(t, "uiColorScheme", OreMarketConfig.ColorScheme.RED_UP.name());
+        if (OreMarketConfig.ColorScheme.GREEN_UP.name().equalsIgnoreCase(scheme)) {
+            return true;
+        }
+        if (!OreMarketConfig.ColorScheme.RED_UP.name().equalsIgnoreCase(scheme)) {
+            warnOnce("uiColorScheme", "uiColorScheme=\"" + scheme + "\" is not RED_UP / GREEN_UP,"
+                    + " falling back to RED_UP (warned once)");
+        }
+        return false;
+    }
+
+    /**
+     * Trade-log prefix convention of this snapshot: a missing, blank or unknown value falls back to BUY_GREEN
+     * (warned once). The two log slots travel as configured and are resolved here exactly once, so a config sync
+     * round trip can never swap the pair a second time.
+     */
+    private static OreMarketConfig.LogColorScheme readLogColorScheme(CompoundTag t) {
+        String scheme = hasString(t, "uiLogColorScheme",
+                OreMarketConfig.LogColorScheme.BUY_GREEN.name());
+        for (OreMarketConfig.LogColorScheme candidate
+                : OreMarketConfig.LogColorScheme.values()) {
+            if (candidate.name().equalsIgnoreCase(scheme)) {
+                return candidate;
+            }
+        }
+        warnOnce("uiLogColorScheme", "uiLogColorScheme=\"" + scheme
+                + "\" is not BUY_GREEN / BUY_RED / FOLLOW_MARKET, falling back to BUY_GREEN (warned once)");
+        return OreMarketConfig.LogColorScheme.BUY_GREEN;
     }
 
     /** Paired band (min/max): when min exceeds max, swap the two and warn once (never written back to the config file). */
@@ -1821,6 +1973,8 @@ public final class MarketSettings {
         t.putInt("leaderboardSize", 10);
         t.putBoolean("leaderboardShowSelf", true);
         for (int i = 0; i < UI_COLOR_DEFAULTS.length; i++) t.putInt("uiColor." + i, UI_COLOR_DEFAULTS[i]);
+        t.putString("uiColorScheme", OreMarketConfig.ColorScheme.RED_UP.name());
+        t.putString("uiLogColorScheme", OreMarketConfig.LogColorScheme.BUY_GREEN.name());
         t.putInt("uiScrollStep", 20);
         t.putInt("uiScrollStepFine", 10);
         t.putInt("uiDragThresholdPx", 5);
